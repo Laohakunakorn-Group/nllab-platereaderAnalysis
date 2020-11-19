@@ -1,0 +1,6 @@
+# Dockerfile 11/2020
+# nllab-python - basic Python environment 
+
+FROM python:3.8.5
+MAINTAINER Nadanai Laohakunakorn <nadanai.laohakunakorn@ed.ac.uk>
+RUN python -m pip install pandas matplotlib scipy numpy seaborn xlrd xlwt openpyxl tellurium emcee corner tqdm biocrnpyler 
