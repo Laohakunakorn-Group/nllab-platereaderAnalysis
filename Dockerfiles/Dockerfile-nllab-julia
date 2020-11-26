@@ -1,8 +1,7 @@
 # Dockerfile 11/2020
 # nllab-julia - basic Julia environment 
 
-ARG BASE_CONTAINER=jupyter/datascience-notebook
-FROM $BASE_CONTAINER
+FROM julia:1.5.3
 MAINTAINER Nadanai Laohakunakorn <nadanai.laohakunakorn@ed.ac.uk>
 
 RUN julia -e 'import Pkg; Pkg.update()' && \
@@ -18,5 +17,3 @@ RUN julia -e 'import Pkg; Pkg.update()' && \
     julia -e 'using Pkg; Pkg.add("PyPlot")' && \
     julia -e 'using Pkg; Pkg.add("Sundials")' && \
     julia -e 'using Pkg; Pkg.precompile()'
-
-WORKDIR $HOME
