@@ -1,6 +1,6 @@
 # readPlate.py
 
-# 09/03/2020 nadanai.laohakunakorn@ed.ac.uk
+# 30/11/2020 nadanai.laohakunakorn@ed.ac.uk
 
 # readPlate
 

@@ -5,7 +5,7 @@ Raw data processing from BMG POLARstar Omega plate reader
 
 This repository contains code to process raw data from the Omega plate reader into reduced form which can be easily analysed in downstream applications. Equivalent code is available as a python script or jupyter notebook. The jupyter notebook contains extensive beginner-friendly documentation. 
 
-Raw data files must be saved in `.xlsx` format (converted from `.CSV`). These are put into the `raw_data` folder. Outputs of the processing will be saved in the `reduced_data` folder. The plate reader output must be in a format compatible with the scripts; the instrument settings file is stored in the `instrument_settings` folder, as well as instrument protocols used to collect the data.
+Raw data files must be saved in `.xlsx` format (converted from `.CSV`). These are put into the `raw_data` folder. Outputs of the processing will be saved in the `reduced_data` folder. The plate reader output must be in a format compatible with the scripts: the preferred output format used is called ```List, sorted by wells, only measured```. The instrument export settings file is stored in the `instrument_settings` folder, as well as instrument protocols used to collect the data.
 
 ---
 ### Usage (Docker)
