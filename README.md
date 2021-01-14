@@ -14,7 +14,7 @@ The preferred method of usage is to run the code from one of our lab's predefine
 
 	nadanai263/nllab-python:001
 	nadanai263/nllab-jupyter:003
-	nadanai263/nllab-julia:003
+	nadanai263/nllab-julia:004
 
 The numeric tags will increase as the containers are updated, so please check them on [DockerHub](https://hub.docker.com/). To use these, clone the repository, open up a terminal and navigate to the directory containing the repository. Then (making sure you have a working [Docker](https://www.docker.com) installation in place), run (on Mac, Linux)
 
