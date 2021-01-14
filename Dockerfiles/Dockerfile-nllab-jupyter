@@ -1,6 +1,167 @@
-# Dockerfile 11/2020
-# nllab-jupyter - basic python jupyter notebook environment 
+# Dockerfile 01/2021
+# nllab-jupyter - basic python/julia jupyter notebook environment 
+# Modified from jupyter/base-notebook, jupyter/minimal-notebook,
+# jupyter/scipy-notebook, and jupyter/datascience-notebook
 
-FROM jupyter/minimal-notebook:6d42503c684f
-MAINTAINER Nadanai Laohakunakorn <nadanai.laohakunakorn@ed.ac.uk>
-RUN python -m pip install pandas matplotlib scipy numpy seaborn xlrd xlwt openpyxl tellurium emcee corner tqdm biocrnpyler 
+ARG BASE_CONTAINER=jupyter/minimal-notebook:6d42503c684f
+FROM $BASE_CONTAINER
+
+LABEL maintainer="Nadanai Laohakunakorn <nadanai.laohakunakorn@ed.ac.uk>"
+
+USER root
+
+# ffmpeg for matplotlib anim & dvipng for latex labels
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg dvipng && \
+    rm -rf /var/lib/apt/lists/*
+
+USER $NB_UID
+
+# Install Python 3 packages
+RUN conda install --quiet --yes \
+    'conda-forge::blas=*=openblas' \
+    'bokeh=2.1.*' \
+    'cython=0.29.*' \
+    'dask=2.20.*' \
+    'ipywidgets=7.5.*' \
+    'ipympl=0.5.*'\
+    'matplotlib-base=3.2.*' \
+    # numba update to 0.49 fails resolving deps.
+    'numba=0.48.*' \
+    'numexpr=2.7.*' \
+    'pandas=1.0.*' \
+    'pytables=3.6.*' \
+    'scikit-image=0.17.*' \
+    'scikit-learn=0.23.*' \
+    'scipy=1.5.*' \
+    'seaborn=0.10.*' \
+    'statsmodels=0.11.*' \
+    'sympy=1.6.*' \
+    'widgetsnbextension=3.5.*'\
+    'xlrd=1.2.*' \
+    && \
+    conda clean --all -f -y && \
+    # Activate ipywidgets extension in the environment that runs the notebook server
+    jupyter nbextension enable --py widgetsnbextension --sys-prefix && \
+    # Also activate ipywidgets extension for JupyterLab
+    # Check this URL for most recent compatibilities
+    # https://github.com/jupyter-widgets/ipywidgets/tree/master/packages/jupyterlab-manager
+    jupyter labextension install @jupyter-widgets/jupyterlab-manager@^2.0.0 --no-build && \
+    jupyter labextension install @bokeh/jupyter_bokeh@^2.0.0 --no-build && \
+    jupyter labextension install jupyter-matplotlib@^0.7.2 --no-build && \
+    jupyter lab build -y && \
+    jupyter lab clean -y && \
+    npm cache clean --force && \
+    rm -rf "/home/${NB_USER}/.cache/yarn" && \
+    rm -rf "/home/${NB_USER}/.node-gyp" && \
+    fix-permissions "${CONDA_DIR}" && \
+    fix-permissions "/home/${NB_USER}"
+
+# Install pip packages
+RUN python -m pip install xlwt openpyxl tellurium emcee corner tqdm biocrnpyler 
+
+# Install facets which does not have a pip or conda package at the moment
+WORKDIR /tmp
+RUN git clone https://github.com/PAIR-code/facets.git && \
+    jupyter nbextension install facets/facets-dist/ --sys-prefix && \
+    rm -rf /tmp/facets && \
+    fix-permissions "${CONDA_DIR}" && \
+    fix-permissions "/home/${NB_USER}"
+
+# Import matplotlib the first time to build the font cache.
+ENV XDG_CACHE_HOME="/home/${NB_USER}/.cache/"
+
+RUN MPLBACKEND=Agg python -c "import matplotlib.pyplot" && \
+    fix-permissions "/home/${NB_USER}"
+
+# End of scipy-notebook
+# Start datascience-notebook
+
+# Fix DL4006
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+USER root
+
+# Julia installation
+# Default values can be overridden at build time
+# (ARGS are in lower case to distinguish them from ENV)
+# Check https://julialang.org/downloads/
+ARG julia_version="1.5.3"
+# SHA256 checksum
+ARG julia_checksum="f190c938dd6fed97021953240523c9db448ec0a6760b574afd4e9924ab5615f1"
+
+# R pre-requisites
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    fonts-dejavu \
+    gfortran \
+    gcc && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Julia dependencies
+# install Julia packages in /opt/julia instead of $HOME
+ENV JULIA_DEPOT_PATH=/opt/julia \
+    JULIA_PKGDIR=/opt/julia \
+    JULIA_VERSION="${julia_version}"
+
+WORKDIR /tmp
+
+# hadolint ignore=SC2046
+RUN mkdir "/opt/julia-${JULIA_VERSION}" && \
+    wget -q https://julialang-s3.julialang.org/bin/linux/x64/$(echo "${JULIA_VERSION}" | cut -d. -f 1,2)"/julia-${JULIA_VERSION}-linux-x86_64.tar.gz" && \
+    echo "${julia_checksum} *julia-${JULIA_VERSION}-linux-x86_64.tar.gz" | sha256sum -c - && \
+    tar xzf "julia-${JULIA_VERSION}-linux-x86_64.tar.gz" -C "/opt/julia-${JULIA_VERSION}" --strip-components=1 && \
+    rm "/tmp/julia-${JULIA_VERSION}-linux-x86_64.tar.gz"
+RUN ln -fs /opt/julia-*/bin/julia /usr/local/bin/julia
+
+# Show Julia where conda libraries are \
+RUN mkdir /etc/julia && \
+    echo "push!(Libdl.DL_LOAD_PATH, \"$CONDA_DIR/lib\")" >> /etc/julia/juliarc.jl && \
+    # Create JULIA_PKGDIR \
+    mkdir "${JULIA_PKGDIR}" && \
+    chown "${NB_USER}" "${JULIA_PKGDIR}" && \
+    fix-permissions "${JULIA_PKGDIR}"
+
+USER $NB_UID
+
+# R packages including IRKernel which gets installed globally.
+RUN conda clean --all -f -y && \
+    fix-permissions "${CONDA_DIR}" && \
+    fix-permissions "/home/${NB_USER}"
+
+# Add Julia packages. Only add HDF5 if this is not a test-only build since
+# it takes roughly half the entire build time of all of the images on Travis
+# to add this one package and often causes Travis to timeout.
+#
+# Install IJulia as jovyan and then move the kernelspec out
+# to the system share location. Avoids problems with runtime UID change not
+# taking effect properly on the .local folder in the jovyan home dir.
+RUN julia -e 'import Pkg; Pkg.update()' && \
+    (test $TEST_ONLY_BUILD || julia -e 'import Pkg; Pkg.add("HDF5")') && \
+        julia -e 'using Pkg; Pkg.add("DelimitedFiles")' && \
+    julia -e 'using Pkg; Pkg.add("DataFrames")' && \
+    julia -e 'using Pkg; Pkg.add("CSV")' && \
+    julia -e 'using Pkg; Pkg.add("XLSX")' && \
+    julia -e 'using Pkg; Pkg.add("Interpolations")' && \
+    julia -e 'using Pkg; Pkg.add("Plots")' && \
+    julia -e 'using Pkg; Pkg.add("DifferentialEquations")' && \
+    julia -e 'using Pkg; Pkg.add("ProgressBars")' && \
+    julia -e 'using Pkg; Pkg.add("Statistics")' && \
+    julia -e 'using Pkg; Pkg.add("DiffEqFlux")' && \
+    julia -e 'using Pkg; Pkg.add("DiffEqParamEstim")' && \
+    julia -e 'using Pkg; Pkg.add("BlackBoxOptim")' && \
+    julia -e 'using Pkg; Pkg.add("Flux")' && \
+    julia -e 'using Pkg; Pkg.add("RecursiveArrayTools")' && \
+    julia -e 'using Pkg; Pkg.add("Optim")' && \
+    julia -e 'using Pkg; Pkg.add("IJulia")' && \
+    julia -e 'using Pkg; Pkg.add("PyCall")' && \
+    julia -e 'using Pkg; Pkg.add("PyPlot")' && \
+    julia -e 'using Pkg; Pkg.add("Sundials")' && \
+    julia -e 'using Pkg; Pkg.precompile()' && \
+    # move kernelspec out of home \
+    mv "${HOME}/.local/share/jupyter/kernels/julia"* "${CONDA_DIR}/share/jupyter/kernels/" && \
+    chmod -R go+rx "${CONDA_DIR}/share/jupyter" && \
+    rm -rf "${HOME}/.local" && \
+    fix-permissions "${JULIA_PKGDIR}" "${CONDA_DIR}/share/jupyter"
+
+WORKDIR $HOME
