@@ -12,13 +12,13 @@ Raw data files must be saved in `.xlsx` format (converted from `.CSV`). These ar
 
 The preferred method of usage is to run the code from one of our lab's predefined Docker containers. We currently have three Docker containers:
 
-	nadanai263/nllab-python:002
-	nadanai263/nllab-jupyter:004
+	nadanai263/nllab-python:003
+	nadanai263/nllab-jupyter:005
 	nadanai263/nllab-julia:004
 
 The numeric tags will increase as the containers are updated, so please check them on [DockerHub](https://hub.docker.com/). To use these, clone the repository, open up a terminal and navigate to the directory containing the repository. Then (making sure you have a working [Docker](https://www.docker.com) installation in place), run (on Mac, Linux)
 
-	docker run -it --rm -v "$PWD":/app nadanai263/nllab-python:002 /bin/bash
+	docker run -it --rm -v "$PWD":/app nadanai263/nllab-python:003 /bin/bash
 
 On Windows, replace `"$PWD"` with `"%CD%"` (for command prompt) or `${pwd}` (for powershell).
 
@@ -28,7 +28,7 @@ This will pull and launch a Docker container, and start up a Linux shell. Your c
 
 You can directly start a Jupyter notebook in your current directory, using
 
-	docker run -p 8888:8888 --rm -it -v "$PWD":/home/jovyan nadanai263/nllab-jupyter:004
+	docker run -p 8888:8888 --rm -it -v "$PWD":/home/jovyan nadanai263/nllab-jupyter:005
 
 Again, on Windows replace `"$PWD"` with `"%CD%"` (for command prompt) or `${pwd}` (for powershell).
 
